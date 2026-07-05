@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>黄紫橙 · 三色转换</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --yellow: #e6b800;
+    --purple: #7b2d8b;
+    --orange: #e67320;
+    --bg: #0d0d0d;
+    --surface: #1a1a1a;
+    --border: #2a2a2a;
+    --text: #e0e0e0;
+    --text-dim: #888;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 80px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  header h1 {
+    font-size: 2.4rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin-bottom: 6px;
+  }
+  header h1 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 3px; vertical-align: middle; position: relative; top: -2px; }
+  header h1 .dot.y { background: var(--yellow); }
+  header h1 .dot.p { background: var(--purple); }
+  header h1 .dot.o { background: var(--orange); }
+  header p { color: var(--text-dim); font-size: 0.95rem; }
+
+  .upload-zone {
+    width: 100%;
+    max-width: 640px;
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 60px 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.25s, background 0.25s;
+    background: var(--surface);
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--yellow);
+    background: #1e1a0f;
+  }
+  .upload-zone svg { display: block; margin: 0 auto 16px; opacity: 0.5; }
+  .upload-zone .label { font-size: 1.05rem; font-weight: 500; }
+  .upload-zone .hint { font-size: 0.82rem; color: var(--text-dim); margin-top: 6px; }
+  .upload-zone input { display: none; }
+
+  .swatches {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }
+  .swatch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+  }
+  .swatch .chip {
+    width: 22px; height: 22px;
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .swatch .chip.y { background: #e6b800; }
+  .swatch .chip.p { background: #7b2d8b; }
+  .swatch .chip.o { background: #e67320; }
+
+  .result-section {
+    display: none;
+    width: 100%;
+    max-width: 1100px;
+    margin-top: 40px;
+  }
+  .result-section.visible { display: block; }
+
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+  @media (max-width: 768px) {
+    .panels { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--surface);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .panel-header {
+    padding: 12px 18px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-header .badge {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 99px;
+    background: #2a2a2a;
+    color: #999;
+  }
+  .panel canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 28px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 24px;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.2s;
+    font-family: inherit;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: var(--yellow);
+    color: #0d0d0d;
+  }
+  .btn-primary:hover { background: #f0c200; }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: #555; }
+  .btn svg { width: 18px; height: 18px; }
+
+  .processing-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    justify-content: center;
+    align-items: center;
+  }
+  .processing-overlay.active { display: flex; }
+  .processing-toast {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px 40px;
+    text-align: center;
+  }
+  .processing-toast p { margin-top: 12px; color: var(--text-dim); font-size: 0.88rem; }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--yellow);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer {
+    margin-top: 64px;
+    color: var(--text-dim);
+    font-size: 0.78rem;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>万物皆可黄<span class="dot y"></span>紫<span class="dot p"></span>橙<span class="dot o"></span></h1>
+  <p>上传图片，将其转换为仅由黄、紫、橙三色构成的画面</p>
+</header>
+
+<div class="upload-zone" id="uploadZone">
+  <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+  <div class="label">点击或拖拽图片到此处上传</div>
+  <div class="hint">支持 JPG、PNG、GIF、WebP · 最大 20MB</div>
+  <input type="file" id="fileInput" accept="image/*">
+</div>
+
+<div class="swatches">
+  <div class="swatch"><span class="chip y"></span>黄</div>
+  <div class="swatch"><span class="chip p"></span>紫</div>
+  <div class="swatch"><span class="chip o"></span>橙</div>
+</div>
+
+<div class="result-section" id="resultSection">
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-header">原图 <span class="badge" id="origSize"></span></div>
+      <canvas id="origCanvas"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-header">三色转换 <span class="badge" id="convSize"></span></div>
+      <canvas id="convCanvas"></canvas>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn btn-primary" id="downloadBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      保存图片
+    </button>
+    <button class="btn btn-secondary" id="newBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      上传新图片
+    </button>
+  </div>
+</div>
+
+<div class="processing-overlay" id="processingOverlay">
+  <div class="processing-toast">
+    <div class="spinner"></div>
+    <p>正在转换中...</p>
+  </div>
+</div>
+
+<footer>yellowpurpleo</footer>
+
+<script>
+  const TARGET_COLORS = [
+    { r: 230, g: 184, b: 0,   name: 'yellow' },
+    { r: 123, g: 45,  b: 139, name: 'purple' },
+    { r: 230, g: 115, b: 32,  name: 'orange' },
+  ];
+
+  function closestColor(r, g, b) {
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < TARGET_COLORS.length; i++) {
+      const c = TARGET_COLORS[i];
+      const dr = r - c.r, dg = g - c.g, db = b - c.b;
+      const dist = 2 * dr * dr + 4 * dg * dg + 3 * db * db;
+      if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+    }
+    return TARGET_COLORS[bestIdx];
+  }
+
+  function convertImage(sourceImg) {
+    const w = sourceImg.width, h = sourceImg.height;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(sourceImg, 0, 0);
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+
+    // Floyd-Steinberg error diffusion
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+
+        let r = Math.min(255, Math.max(0, data[idx]));
+        let g = Math.min(255, Math.max(0, data[idx + 1]));
+        let b = Math.min(255, Math.max(0, data[idx + 2]));
+
+        const nearest = closestColor(r, g, b);
+        const errR = r - nearest.r;
+        const errG = g - nearest.g;
+        const errB = b - nearest.b;
+
+        data[idx]     = nearest.r;
+        data[idx + 1] = nearest.g;
+        data[idx + 2] = nearest.b;
+
+        if (x + 1 < w) {
+          const ri = (y * w + (x + 1)) * 4;
+          data[ri]     += errR * 7 / 16;
+          data[ri + 1] += errG * 7 / 16;
+          data[ri + 2] += errB * 7 / 16;
+        }
+        if (y + 1 < h) {
+          if (x > 0) {
+            const bl = ((y + 1) * w + (x - 1)) * 4;
+            data[bl]     += errR * 3 / 16;
+            data[bl + 1] += errG * 3 / 16;
+            data[bl + 2] += errB * 3 / 16;
+          }
+          const bd = ((y + 1) * w + x) * 4;
+          data[bd]     += errR * 5 / 16;
+          data[bd + 1] += errG * 5 / 16;
+          data[bd + 2] += errB * 5 / 16;
+
+          if (x + 1 < w) {
+            const br = ((y + 1) * w + (x + 1)) * 4;
+            data[br]     += errR * 1 / 16;
+            data[br + 1] += errG * 1 / 16;
+            data[br + 2] += errB * 1 / 16;
+          }
+        }
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+  }
+
+  function displayResult(originalImg) {
+    const origCanvas = document.getElementById('origCanvas');
+    const convCanvas = document.getElementById('convCanvas');
+    const resultSection = document.getElementById('resultSection');
+    const origSize = document.getElementById('origSize');
+    const convSize = document.getElementById('convSize');
+    const procOverlay = document.getElementById('processingOverlay');
+
+    procOverlay.classList.add('active');
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const w = originalImg.width, h = originalImg.height;
+
+        origCanvas.width = w;
+        origCanvas.height = h;
+        origCanvas.getContext('2d').drawImage(originalImg, 0, 0);
+        origSize.textContent = w + '\u00d7' + h;
+
+        const converted = convertImage(originalImg);
+
+        convCanvas.width = w;
+        convCanvas.height = h;
+        convCanvas.getContext('2d').drawImage(converted, 0, 0);
+        convSize.textContent = w + '\u00d7' + h;
+
+        resultSection.classList.add('visible');
+        procOverlay.classList.remove('active');
+
+        convCanvas._convertedCanvas = converted;
+      });
+    });
+  }
+
+  function loadImage(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => displayResult(img);
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  const uploadZone = document.getElementById('uploadZone');
+  const fileInput = document.getElementById('fileInput');
+
+  uploadZone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) loadImage(fileInput.files[0]);
+  });
+
+  uploadZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.classList.add('drag-over');
+  });
+  uploadZone.addEventListener('dragleave', () => {
+    uploadZone.classList.remove('drag-over');
+  });
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) loadImage(file);
+  });
+
+  document.getElementById('downloadBtn').addEventListener('click', () => {
+    const convCanvas = document.getElementById('convCanvas');
+    const src = convCanvas._convertedCanvas || convCanvas;
+    const link = document.createElement('a');
+    link.download = 'huangzicheng_' + Date.now() + '.png';
+    link.href = src.toDataURL('image/png');
+    link.click();
+  });
+
+  document.getElementById('newBtn').addEventListener('click', () => {
+    document.getElementById('resultSection').classList.remove('visible');
+    fileInput.value = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  // Load default preset image on page load
+  (function loadPreset() {
+    const img = new Image();
+    img.onload = () => displayResult(img);
+    img.src = 'preset.jpg';
+  })();
+</script>
+</body>
+</html>
